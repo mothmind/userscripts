@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         NAI Autogenerate
 // @namespace    http://tampermonkey.net/
-// @version      2024-04-26
+// @version      2024-04-26.1
 // @description  Adds a button to autoclick the generate button if available
 // @author       You
 // @match        https://novelai.net/image
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=novelai.net
 // @grant        none
+// @updateURL    https://raw.githubusercontent.com/mothmind/userscripts/main/novelai-autogen.user.js
+// @downloadURL  https://raw.githubusercontent.com/mothmind/userscripts/main/novelai-autogen.user.js
 // ==/UserScript==
 
 (function () {
