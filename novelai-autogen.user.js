@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NAI Autogenerate
 // @namespace    http://tampermonkey.net/
-// @version      2024-04-26.1
+// @version      2024-04-26.2
 // @description  Adds a button to autoclick the generate button if available
 // @author       mothmind
 // @match        https://novelai.net/image
