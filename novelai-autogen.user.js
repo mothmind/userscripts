@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NAI Autogenerate
 // @namespace    http://tampermonkey.net/
-// @version      2024-05-24.01
+// @version      2024-06-02.01
 // @description  Adds a button to autoclick the generate button if available
 // @author       mothmind
 // @match        https://novelai.net/*
@@ -59,14 +59,22 @@
 
     const inputs = [];
     const autogenButtons = [];
-    buttons.forEach((button) => {
-      /** @type {HTMLButtonElement} */
-      const clone = /** @type {HTMLButtonElement} */ (button.cloneNode());
+    attachAutogenDesktop(buttons[0]);
+    attachAutogenMobile(buttons[1]);
+
+    for (let b of autogenButtons) {
+      b.addEventListener("click", toggleAutogen);
+    }
+
+    function attachAutogenDesktop(generateButton) {
+      const clone = /** @type {HTMLButtonElement} */ (
+        generateButton.cloneNode()
+      );
       const div = document.createElement("div");
       const label = document.createElement("label");
       const input = document.createElement("input");
 
-      clone.id = "autogen-button";
+      clone.id = "autogen-button-desktop";
       clone.innerHTML = "Enable Autogen " + uncheckedBoxIcon;
       clone.style.marginTop = "16px";
       clone.style.width = "100%";
@@ -87,15 +95,28 @@
 
       div.appendChild(label);
       div.appendChild(input);
-      button.after(clone);
-      button.after(div);
+      generateButton.after(clone);
+      generateButton.after(div);
 
       inputs.push(input);
       autogenButtons.push(clone);
-    });
+    }
 
-    for (let b of autogenButtons) {
-      b.addEventListener("click", toggleAutogen);
+    function attachAutogenMobile(generateButton) {
+      const clone = /** @type {HTMLButtonElement} */ (
+        generateButton.cloneNode()
+      );
+
+      clone.id = "autogen-button-mobile";
+      clone.innerHTML = "Enable Autogen " + uncheckedBoxIcon;
+      /*
+      clone.style.marginTop = "16px";
+      clone.style.width = "100%";
+      */
+      generateButton.after(clone);
+      generateButton.style.display = "none";
+
+      autogenButtons.push(clone);
     }
 
     function triggerAutogen() {
