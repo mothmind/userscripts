@@ -31,6 +31,8 @@
           return preface + "3 - Cyberaudio shorts for [[1d6]] turns." + sufface;
         case 4: {
           const limbPriority = [];
+          const pushLimb = (limbName) =>
+            !limbPriority.includes(limbName) && limbPriority.push(limbName);
           while (limbPriority.length !== 4) {
             switch (rollDie(6)) {
               case 1:
@@ -49,9 +51,6 @@
                 continue;
               default:
                 return "🚨D6 ROLLED A 7 OR SOMETHING!!!🚨";
-            }
-            function pushLimb(limbName) {
-              if (!limbPriority.includes(limbName)) limbPriority.push(limbName);
             }
           }
           return (
