@@ -101,7 +101,7 @@
 
     const button = document.createElement("button");
     button.id = "macroMenuButton";
-    button.textContent = "⚙ Macros";
+    button.textContent = "⚙ Moth Macros";
     button.style.marginLeft = "4px";
     button.style.padding = "2px 6px";
     button.style.fontSize = "12px";
