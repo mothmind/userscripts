@@ -4,7 +4,7 @@
 // @version      2025-07-16.02
 // @description  Adds hotkeys for bold and italic text in AO3 editor
 // @author       mothmind
-// @match        https://archiveofourown.org
+// @match        https://archiveofourown.org/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=archiveofourown.org
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/mothmind/userscripts/main/ao3-hotkeys.user.js
