@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ao3 Hotkeys
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-16.02
+// @version      2025-07-16.03
 // @description  Adds hotkeys for bold and italic text in AO3 editor
 // @author       mothmind
 // @match        https://archiveofourown.org/*
