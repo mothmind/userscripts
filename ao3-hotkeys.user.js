@@ -39,7 +39,7 @@
 
       if (e.ctrlKey && e.key === "i") {
         e.preventDefault();
-        wrapSelection(editor, "<i>", "</i>");
+        wrapSelection(editor, "<em>", "</em>");
       }
     });
   }
