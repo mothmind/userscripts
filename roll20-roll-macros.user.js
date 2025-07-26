@@ -112,7 +112,7 @@
       const damageRolls = Object.fromEntries(
         Object.entries(locationHitCount).map(([loc, count]) => {
           const baseDamage = Math.round(
-            pen * rangeMod * Math.floor(shotsHit / 10) * 0.5 + 1
+            pen * rangeMod * (Math.floor(shotsHit / 10) * 0.5 + 1)
           );
           const effectiveArmor = Math.ceil(armor * flankMod);
           const armorDamage = baseDamage - Math.ceil(armor * flankMod);
