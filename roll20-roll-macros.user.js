@@ -62,9 +62,11 @@ const macroRecord = {
     return `&{template:default} {{name=Microwaver}} {{Roll=🎲${content}}}`;
   },
   "Vehicle Damage": async () => {
-    const details = await getMultiInputModal({
+    const input = await getMultiInputModal({
+      "Exceeded To-Hit": "number",
       "Shots Hit": "number",
-      "Weapon Penetration Value": "number",
+      "Weapon Base Penetration": "number",
+      "Weapon ROF": "number",
       "Vehicle Armor Value": "number",
       "Vehicle Body": "number",
       "Vehicle Has Turret": "checkbox",
@@ -77,18 +79,20 @@ const macroRecord = {
      * @typedef {"None/Explosive" | "Long" | "Extreme"} Range
      */
 
-    const shotsHit = parseInt(details["Shots Hit"]);
-    const armor = parseInt(details["Vehicle Armor Value"]);
-    const body = parseInt(details["Vehicle Body"]);
-    const pen = parseInt(details["Weapon Penetration Value"]);
-    const hasTurret = details["Has Turret"] === "on";
-    const isAV = details["Is AV"] === "on";
+    const hitOver = parseInt(input["Exceeded To-Hit"]);
+    const shotsHit = parseInt(input["Shots Hit"]);
+    const pen = parseInt(input["Weapon Penetration Value"]);
+    const rof = parseInt(input["Weapon ROF"]);
+    const armor = parseInt(input["Vehicle Armor Value"]);
+    const body = parseInt(input["Vehicle Body"]);
+    const hasTurret = input["Has Turret"] === "on";
+    const isAV = input["Is AV"] === "on";
     /** @type {FiringAngle} */
     // @ts-ignore
-    const firingAngle = details["Firing Angle"];
+    const firingAngle = input["Firing Angle"];
     /** @type {Range} */
     // @ts-ignore
-    const range = details["Range"];
+    const range = input["Range"];
 
     const rangeMod = getRangeMod(range);
     const flankMod = getFlankMod(firingAngle, isAV);
@@ -109,10 +113,9 @@ const macroRecord = {
     }
 
     const damageRolls = Object.entries(locationHitCount).map(([loc, count]) => {
-      // TODO: Implement GOOD HIT modifier properly - Separate from shotsHit
-      const baseDamage = Math.round(
-        pen * rangeMod * (Math.floor(shotsHit / 10) * 0.5 + 1)
-      );
+      const volleyBonus = rof > 99 ? 9 / 4 : rof > 30 ? 1 : 0;
+      const roundDamage = pen * rangeMod * (Math.floor(hitOver / 10) * 0.5 + 1);
+      const baseDamage = Math.round(roundDamage + volleyBonus * roundDamage);
       const effectiveArmor = Math.ceil(armor * flankMod);
       const hasPenetrated = baseDamage - Math.ceil(armor * flankMod) >= 0;
       const dmg = rollDie(10);
