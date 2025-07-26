@@ -12,6 +12,9 @@
 
 "use strict";
 
+const modalCache = new Map();
+const testMode = false;
+
 /** @type {Record<string, () => string | Promise<string>>} */
 const macroRecord = {
   "Microwaver Effect": () => {
@@ -64,9 +67,8 @@ const macroRecord = {
   "Vehicle Damage": async () => {
     const input = await getMultiInputModal({
       "Exceeded To-Hit": "number",
-      "Shots Hit": "number",
+      "Shots Fired (ROF)": "number",
       "Weapon Base Penetration": "number",
-      "Weapon ROF": "number",
       "Vehicle Armor Value": "number",
       "Vehicle Body": "number",
       "Vehicle Has Turret": "checkbox",
@@ -80,9 +82,8 @@ const macroRecord = {
      */
 
     const hitOver = parseInt(input["Exceeded To-Hit"]);
-    const shotsHit = parseInt(input["Shots Hit"]);
-    const pen = parseInt(input["Weapon Penetration Value"]);
-    const rof = parseInt(input["Weapon ROF"]);
+    const shotsFired = parseInt(input["Shots Fired (ROF)"]);
+    const pen = parseInt(input["Weapon Base Penetration"]);
     const armor = parseInt(input["Vehicle Armor Value"]);
     const body = parseInt(input["Vehicle Body"]);
     const hasTurret = input["Has Turret"] === "on";
@@ -97,9 +98,14 @@ const macroRecord = {
     const rangeMod = getRangeMod(range);
     const flankMod = getFlankMod(firingAngle, isAV);
 
+    const volleySize = shotsFired > 99 ? 10 : shotsFired > 29 ? 5 : 1;
+    const volleyPen = pen + Math.round(((volleySize - 1) * pen) / 4);
+    const maxVolleys = Math.floor(shotsFired / volleySize);
+    const numHits = Math.min(hitOver + 1, maxVolleys);
+
     /** @type {Record<string, number>} */
     const locationHitCount = {};
-    for (let i = 0; i < +shotsHit; i++) {
+    for (let i = 0; i < +numHits; i++) {
       const location = getLocation(firingAngle, hasTurret);
       const finalLocation =
         location === "Turret" || location === "Hull"
@@ -113,20 +119,16 @@ const macroRecord = {
     }
 
     const damageRolls = Object.entries(locationHitCount).map(([loc, count]) => {
-      const volleyBonus = rof > 99 ? 9 / 4 : rof > 30 ? 1 : 0;
-      const roundDamage = pen * rangeMod * (Math.floor(hitOver / 10) * 0.5 + 1);
-      const baseDamage = Math.round(roundDamage + volleyBonus * roundDamage);
+      const basePen =
+        volleyPen * rangeMod * (Math.floor(hitOver / 10) * 0.5 + 1);
       const effectiveArmor = Math.ceil(armor * flankMod);
-      const hasPenetrated = baseDamage - Math.ceil(armor * flankMod) >= 0;
+      const hasPenetrated = basePen - Math.ceil(armor * flankMod) >= 0;
       const dmg = rollDie(10);
-      const bodyDamage = Math.max(
-        0,
-        dmg.roll + baseDamage * count - armor - body
-      );
+      const bodyDamage = Math.max(0, dmg.roll + basePen * count - armor - body);
 
       return [
         loc,
-        `${baseDamage}x${count} hits + ${
+        `${basePen}x${count} hits + ${
           dmg.label
         } against ${effectiveArmor} AV ${body} Body\n${getDetails()}`,
       ];
@@ -484,10 +486,16 @@ function openMacroModal() {
       const input = document.querySelector("textarea.ui-autocomplete-input");
       const sendButton = document.getElementById("chatSendBtn");
       if (input && sendButton) {
-        input.value = await func();
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        sendButton.click();
-        modal.remove();
+        if (testMode) {
+          console.info(`Executing macro: ${name}`);
+          console.info("Response: ", await func());
+          modal.remove();
+        } else {
+          input.value = await func();
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          sendButton.click();
+          modal.remove();
+        }
       } else {
         console.error("Could not find chat input or send button.");
         modal.remove();
@@ -530,6 +538,18 @@ function getMultiInputModal(inputs) {
         input = document.createElement("input");
         input.type = inputType;
       }
+      if (input.type === "checkbox") {
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            input.checked = !input.checked;
+          }
+        });
+        if (modalCache.get(inputName) === "on") input.checked = true;
+      } else {
+        const lastValue = modalCache.get(inputName) || null;
+        if (lastValue !== null) input.value = lastValue;
+      }
       modal.appendChild(input);
       fields[inputName] = input;
     });
@@ -550,7 +570,12 @@ function getMultiInputModal(inputs) {
     okBtn.onclick = () => {
       const result = {};
       for (const key in fields) {
-        result[key] = fields[key].value;
+        if (fields[key].type === "checkbox") {
+          result[key] = fields[key].checked ? "on" : "off";
+        } else {
+          result[key] = fields[key].value;
+        }
+        modalCache.set(key, result[key]);
       }
       closeModal(result);
     };
