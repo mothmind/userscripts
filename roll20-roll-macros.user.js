@@ -13,6 +13,20 @@
 (function () {
   ("use strict");
 
+  class Dice {
+    /** @param {number} sides @param {number} num */
+    constructor(sides, num = 1) {
+      this.sides = sides;
+      this.num = num;
+      let roll = 0;
+      for (let i = 0; i < num; i++) {
+        roll += Math.floor(Math.random() * sides) + 1;
+      }
+      this.roll = roll;
+      this.label = `\`\`${this.num}d${this.sides}🎲${this.roll}\`\``;
+    }
+  }
+
   /** @type {Record<string, () => string | Promise<string>>} */
   const macroRecord = {
     "Microwaver Effect": () => {
@@ -116,100 +130,129 @@
           );
           const effectiveArmor = Math.ceil(armor * flankMod);
           const armorDamage = baseDamage - Math.ceil(armor * flankMod);
-          const damageRoll = rollDie(10);
+          const dmg = new Dice(10);
           const bodyDamage = Math.max(
             0,
-            damageRoll + baseDamage * count - armor - body
+            dmg.roll + baseDamage * count - armor - body
           );
 
           return [
             loc,
-            `${baseDamage} Pen x${count} hits + 🎲${damageRoll} against ${effectiveArmor} AV and ${body} Body: \n${(() => {
-              if (armorDamage <= 0 || bodyDamage <= 0)
-                return `Surface Hit - ${
-                  rollDie(10) > 6
-                    ? "No Damage"
-                    : pen > 2 || rollDie(2) === 1
-                    ? "Random exposed equipment destroyed."
-                    : "Random exposed equipment damaged, repairable."
+            `${baseDamage} Pen x${count} hits + ${
+              dmg.label
+            } against ${effectiveArmor} AV and ${body} Body\n${(() => {
+              if (armorDamage <= 0 || bodyDamage <= 0) {
+                const hitDie = new Dice(10);
+                const coinFlip = new Dice(2);
+                return `**Surface Hit**\n${
+                  hitDie.roll > 6
+                    ? hitDie.label + " > 6: No Damage"
+                    : pen > 2 || coinFlip.roll === 1
+                    ? coinFlip.label + " Random exposed equipment destroyed."
+                    : coinFlip.label +
+                      " Random exposed equipment damaged, repairable."
                 }`;
+              }
               if (bodyDamage <= 5) {
-                let addendum = "";
+                let details = "";
                 if (loc.includes("Fuel"))
-                  addendum =
+                  details =
                     "25% chance of catching fire, dealing 3d6 to each crew member each turn until extinguished. Each turn it burns, 25% chance of explosion, destroying the vehicle. Both chances reduced to 5% if fire/damage control system installed.";
                 else if (loc.includes("Crew"))
-                  addendum =
+                  details =
                     "Crew members take 4d6 damage to random location. Body armor will reduce this damage.";
                 else if (loc.includes("Empty Space"))
-                  addendum = "Fuck all happens, haha.";
-                else
-                  addendum =
-                    rollDie(5) === 1
-                      ? "Equipment/weapon/system is destroyed and must be replaced."
-                      : "Equipment/weapon/system is damaged and will not function again until repaired.";
-                return `Minor Damage: ${loc}\n${addendum}`;
+                  details = "Fuck all happens, haha.";
+                else {
+                  const destroyed = new Dice(10);
+                  details =
+                    destroyed.roll < 3
+                      ? destroyed.label +
+                        " Equipment/weapon/system is destroyed and must be replaced."
+                      : destroyed.label +
+                        " Equipment/weapon/system is damaged and will not function again until repaired.";
+                }
+                return `**Minor Damage - ${loc}**\n${details}`;
               } else if (bodyDamage <= 9) {
-                let addendum = "";
+                let details = "";
                 if (loc.includes("Fuel"))
-                  addendum =
+                  details =
                     "50% chance of catching fire, dealing 3d6 to each crew member each turn until extinguished. Each turn it burns, 25% chance of explosion, destroying the vehicle. Both chances reduced to 10% if fire/damage control system installed.";
                 else if (loc.includes("Crew"))
-                  addendum =
+                  details =
                     "Crew members take 6d6 damage to random location. Body armor will reduce this damage.";
                 else if (loc.includes("Empty Space"))
-                  addendum = "Fuck all happens, haha.";
-                else if (loc.includes("Engine"))
-                  addendum =
-                    rollDie(2) === 1
-                      ? "Engine explosion! Vehicle is destroyed."
-                      : rollDie(10) === 1
-                      ? "Engine is damaged and will not function again until repaired."
-                      : "Engine is destroyed and must be replaced.";
-                else if (loc.includes("Ammo")) {
+                  details = "Fuck all happens, haha.";
+                else if (loc.includes("Engine")) {
+                  const explosion = new Dice(2);
+                  const destroyed = new Dice(10);
+                  details =
+                    explosion.roll === 1
+                      ? explosion.label +
+                        " Engine explosion! Vehicle is destroyed."
+                      : explosion.roll === 1
+                      ? destroyed.label +
+                        " Engine is damaged and will not function again until repaired."
+                      : destroyed.label +
+                        " Engine is destroyed and must be replaced.";
+                } else if (loc.includes("Ammo")) {
+                  const explosion = new Dice(2);
+                  const destroyed = new Dice(10);
                   const suffix =
-                    rollDie(10) === 1
-                      ? "Cargo/Ammo is damaged and will not function again until repaired."
-                      : "Cargo/Ammo is destroyed and must be replaced.";
-                  addendum =
-                    rollDie(2) === 1
-                      ? "Ammo explosion! Vehicle is destroyed. If applicable. Otherwise: " +
-                        suffix
-                      : suffix;
-                } else
-                  addendum =
-                    rollDie(10) === 1
-                      ? "Equipment/weapon/system is damaged and will not function again until repaired."
-                      : "Equipment/weapon/system is destroyed and must be replaced.";
-                return `Major Damage: ${loc}\n${addendum}`;
-              } else {
-                let addendum = "";
-                if (loc.includes("Fuel"))
-                  addendum =
-                    "50% chance of catching fire, dealing 3d6 to each crew member each turn until extinguished. Each turn it burns, 25% chance of explosion, destroying the vehicle. Both chances reduced to 30% if fire/damage control system installed.";
-                else if (loc.includes("Crew"))
-                  addendum =
-                    "Crew members take 10d6 damage to random location. Body armor will reduce this damage.";
-                else if (loc.includes("Empty Space"))
-                  addendum = "Fuck all happens, haha. Damn.";
-                else if (loc.includes("Engine"))
-                  addendum =
-                    rollDie(10) === 1
-                      ? "Engine explosion! Vehicle is destroyed."
-                      : "Engine is destroyed and must be replaced.";
-                else if (loc.includes("Ammo")) {
-                  const suffix =
-                    "Cargo/Ammo is destroyed and must be replaced.";
-                  addendum =
-                    rollDie(10) === 1
-                      ? "Ammo explosion! Vehicle is destroyed. If applicable. Otherwise: " +
+                    destroyed.roll === 1
+                      ? destroyed.label +
+                        " Cargo/Ammo is damaged and will not function again until repaired."
+                      : destroyed.label +
+                        " Cargo/Ammo is destroyed and must be replaced.";
+                  details =
+                    explosion.roll === 1
+                      ? explosion.label +
+                        " Ammo explosion! Vehicle is destroyed. If applicable. Otherwise: " +
                         suffix
                       : suffix;
                 } else {
-                  addendum =
+                  const destroyed = new Dice(10);
+                  details =
+                    destroyed.roll === 1
+                      ? destroyed.label +
+                        " Equipment/weapon/system is damaged and will not function again until repaired."
+                      : destroyed.label +
+                        " Equipment/weapon/system is destroyed and must be replaced.";
+                }
+                return `**Major Damage - ${loc}**\n${details}`;
+              } else {
+                let details = "";
+                if (loc.includes("Fuel"))
+                  details =
+                    "50% chance of catching fire, dealing 3d6 to each crew member each turn until extinguished. Each turn it burns, 25% chance of explosion, destroying the vehicle. Both chances reduced to 30% if fire/damage control system installed.";
+                else if (loc.includes("Crew"))
+                  details =
+                    "Crew members take 10d6 damage to random location. Body armor will reduce this damage.";
+                else if (loc.includes("Empty Space"))
+                  details = "Fuck all happens, haha. Damn.";
+                else if (loc.includes("Engine")) {
+                  const explosion = new Dice(10);
+                  details =
+                    explosion.roll === 1
+                      ? explosion.label +
+                        " Engine is destroyed and must be replaced."
+                      : explosion.label +
+                        " Engine explosion! Vehicle is destroyed.";
+                } else if (loc.includes("Ammo")) {
+                  const explosion = new Dice(10);
+                  const suffix =
+                    "Cargo/Ammo is destroyed and must be replaced.";
+                  details =
+                    explosion.roll === 1
+                      ? explosion.label + " " + suffix
+                      : explosion.label +
+                        " Ammo explosion! Vehicle is destroyed. If applicable. Otherwise: " +
+                        suffix;
+                } else {
+                  details =
                     "Equipment/weapon/system is destroyed and must be replaced.";
                 }
-                return `Catastrophic Damage: ${loc}\n${addendum}`;
+                return `**Catastrophic Damage - ${loc}**\n${details}`;
               }
             })()}`,
           ];
