@@ -65,11 +65,11 @@
     "Vehicle Damage": async () => {
       const details = await getMultiInputModal({
         "Shots Hit": "number",
+        "Weapon Penetration Value": "number",
         "Vehicle Armor Value": "number",
         "Vehicle Body": "number",
-        "Weapon Penetration Value": "number",
-        "Has Turret": "checkbox",
-        "Is AV": "checkbox",
+        "Vehicle Has Turret": "checkbox",
+        "Vehicle Is AV": "checkbox",
         "Firing Angle": ["Front", "Top", "Side", "Back", "Bottom"],
         "Range Penalty": ["None/Explosive", "Long", "Extreme"],
       });
@@ -111,17 +111,20 @@
 
       const damageRolls = Object.fromEntries(
         Object.entries(locationHitCount).map(([loc, count]) => {
+          const baseDamage = Math.round(
+            pen * rangeMod * Math.floor(shotsHit / 10) * 0.5 + 1
+          );
+          const effectiveArmor = Math.ceil(armor * flankMod);
+          const armorDamage = baseDamage - Math.ceil(armor * flankMod);
+          const damageRoll = rollDie(10);
+          const bodyDamage = Math.max(
+            0,
+            damageRoll + baseDamage * count - armor - body
+          );
+
           return [
             loc,
-            `${count} hits: ${(() => {
-              const baseDamage = Math.round(
-                pen * rangeMod * Math.floor(shotsHit / 10)
-              );
-              const armorDamage = baseDamage - Math.ceil(armor * flankMod);
-              const bodyDamage = Math.max(
-                0,
-                rollDie(10) + baseDamage * count - body
-              );
+            `${baseDamage} Pen x${count} hits + 🎲${damageRoll} against ${effectiveArmor} AV and ${body} Body: \n${(() => {
               if (armorDamage <= 0 || bodyDamage <= 0)
                 return `Surface Hit - ${
                   rollDie(10) > 6
@@ -333,43 +336,68 @@
     const style = document.createElement("style");
     style.id = "moth-modal-style";
     style.textContent = `
-    .moth-modal {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #EEE;
-      color: #222;
-      padding: 20px;
-      border: 2px solid #888;
-      border-radius: 8px;
-      z-index: 99999;
-      box-shadow: 0 0 10px black;
-      min-width: 260px;
-      text-align: center;
-    }
-    .moth-modal button {
-      display: block;
-      width: 100%;
-      margin: 5px 0px;
-      padding: 6px;
-      background: rgb(68, 68, 68);
-      color: rgb(238, 238, 238);
-      border: 1px solid rgb(102, 102, 102);
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .moth-modal button.close-btn {
-      position: absolute;
-      width: auto;
-      top: 10px;
-      right: 10px;
-      background: transparent;
-      color: #222;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-    }
+.moth-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #EEE;
+  color: #222;
+  padding: 20px;
+  border: 2px solid #888;
+  border-radius: 8px;
+  z-index: 99999;
+  box-shadow: 0 0 10px black;
+  min-width: 260px;
+  text-align: center;
+}
+.moth-modal button {
+  display: block;
+  width: 100%;
+  margin: 5px 0px;
+  padding: 6px;
+  background: rgb(68, 68, 68);
+  color: rgb(238, 238, 238);
+  border: 1px solid rgb(102, 102, 102);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.moth-modal button.close-btn {
+  position: absolute;
+  width: auto;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  color: #222;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+.moth-multi-input-modal {
+  text-align: left;
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 4px 8px;
+  align-items: start;
+}
+.moth-multi-input-modal label {
+  grid-column: 1;
+}
+.moth-multi-input-modal select, .moth-multi-input-modal input {
+  width: 100%;
+  grid-column: 1 / span 2;
+}
+.moth-multi-input-modal input[type="checkbox"], .moth-multi-input-modal input[type="number"] {
+  grid-column: 2;
+}
+#macro-menu-button {
+  margin-left: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid #BBB;
+  border-radius: 2px;
+}
   `;
     document.head.appendChild(style);
   }
@@ -392,18 +420,11 @@
   }
 
   function injectMacroMenu(sendButton, chatContainer) {
-    // Prevent duplicate injection
-    if (document.getElementById("macroMenuButton")) return;
+    if (document.getElementById("macro-menu-button")) return; // Prevent duplicate injection
 
     const button = document.createElement("button");
-    button.id = "macroMenuButton";
+    button.id = "macro-menu-button";
     button.textContent = "⚙ Moth Macros";
-    button.style.marginLeft = "4px";
-    button.style.padding = "2px 6px";
-    button.style.fontSize = "12px";
-    button.style.cursor = "pointer";
-    button.style.border = "1px solid #BBB";
-    button.style.borderRadius = "2px";
 
     chatContainer.appendChild(button);
 
@@ -460,14 +481,13 @@
   function getMultiInputModal(inputs) {
     return new Promise((resolve) => {
       const modal = document.createElement("div");
-      modal.className = "moth-modal";
+      modal.className = "moth-modal moth-multi-input-modal";
 
       const fields = {};
 
       Object.entries(inputs).forEach(([inputName, inputType]) => {
         const label = document.createElement("div");
         label.textContent = inputName;
-        label.style.marginBottom = "6px";
         modal.appendChild(label);
 
         let input;
@@ -482,16 +502,13 @@
         } else {
           input = document.createElement("input");
           input.type = inputType;
-          input.style.width = "90%";
         }
-        input.style.marginBottom = "12px";
         modal.appendChild(input);
         fields[inputName] = input;
       });
 
       const okBtn = document.createElement("button");
       okBtn.textContent = "OK";
-      okBtn.style.marginRight = "8px";
       modal.appendChild(okBtn);
 
       const cancelBtn = document.createElement("button");
