@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Roll20 Macro Injector
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-27.01
+// @version      2025-07-27.02
 // @description  Adds a macro menu to the chat bar
 // @author       mothmind
 // @match        https://app.roll20.net/editor/
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=roll20.net
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/mothmind/userscripts/main/roll20-roll-macros.user.js
 // @downloadURL  https://raw.githubusercontent.com/mothmind/userscripts/main/roll20-roll-macros.user.js
@@ -349,7 +350,7 @@ const macroRecord = {
       }
     }
   },
-  Deviation: () => {
+  "Grenade Deviation": () => {
     const direction = rollDie(10);
     const distance = rollDie(10);
 
@@ -368,6 +369,145 @@ const macroRecord = {
       }[direction.roll] || "Unknown Direction";
 
     return `Missed by \`\`${distance.roll}\`\`m \`\`${directionLabel}\`\`.\n ${distance.label} ${direction.label}`;
+  },
+  "Damage Thru Armor": async () => {
+    const damageTypes = /** @type {const} */ ([
+      "Normal",
+      "Armor Piercing",
+      "Armor Piercing Full Damage",
+      "Knife",
+      "Monoknife",
+      "Fire",
+      "Power Sword",
+      "Hollow Point",
+      "Safety Rounds",
+      "Monowire",
+      "Flechette/Railgun",
+      "Broadhead Arrow",
+      "Spinner Arrow",
+      "Shotgun Beanbag",
+    ]);
+    /** @type {Record<typeof damageTypes[number], {soft: number, hard: number, thru: number, special?: boolean}>} */
+    const damageProfiles = {
+      Normal: {
+        soft: 1,
+        hard: 1,
+        thru: 1,
+      },
+      "Armor Piercing": {
+        soft: 1 / 2,
+        hard: 1 / 2,
+        thru: 1 / 2,
+      },
+      "Armor Piercing Full Damage": {
+        soft: 1 / 2,
+        hard: 1 / 2,
+        thru: 1,
+      },
+      Knife: {
+        soft: 1 / 2,
+        hard: 1,
+        thru: 1,
+      },
+      Monoknife: {
+        soft: 1 / 3,
+        hard: 2 / 3,
+        thru: 1,
+      },
+      Fire: {
+        soft: 1,
+        hard: 1,
+        thru: 1,
+        special: true,
+      },
+      "Power Sword": {
+        soft: 1 / 4,
+        hard: 1 / 2,
+        thru: 1,
+      },
+      "Hollow Point": {
+        soft: 2,
+        hard: 2,
+        thru: 2,
+      },
+      "Safety Rounds": {
+        soft: 2,
+        hard: 2,
+        thru: 3,
+        special: true,
+      },
+      Monowire: {
+        soft: 1 / 3,
+        hard: 1 / 3,
+        thru: 1,
+      },
+      "Flechette/Railgun": {
+        soft: 1 / 4,
+        hard: 1 / 4,
+        thru: 1 / 2,
+      },
+      "Broadhead Arrow": {
+        soft: 1 / 2,
+        hard: 1,
+        thru: 2,
+      },
+      "Spinner Arrow": {
+        soft: 1 / 2,
+        hard: 1,
+        thru: 3,
+      },
+      "Shotgun Beanbag": {
+        soft: 1,
+        hard: 1,
+        thru: 1,
+        special: true,
+      },
+    };
+    const armorTypes = /** @type {const} */ (["Soft", "Hard"]);
+    const input = await getMultiInputModal({
+      "Damage Done": "number",
+      "Armor SP": "number",
+      // @ts-ignore
+      "Armor Type": armorTypes,
+      // @ts-ignore
+      "Damage Type": damageTypes,
+    });
+    const damageDone = parseInt(input["Damage Done"]);
+    const armorSP = parseInt(input["Armor SP"]);
+    /** @type {typeof armorTypes[number]} */
+    // @ts-ignore
+    const armorType = input["Armor Type"];
+    /** @type {typeof damageTypes[number]} */
+    // @ts-ignore
+    const damageType = input["Damage Type"];
+
+    const { soft, hard, thru, special } = damageProfiles[damageType];
+    const effectiveSP = armorType === "Soft" ? soft * armorSP : hard * armorSP;
+    let damage = Math.max(0, (damageDone - effectiveSP) * thru);
+    let note = "";
+    if (special) {
+      if (damageType === "Fire") {
+        note = "Fire damage.";
+        if (armorType === "Soft") {
+          if (effectiveSP < 15) {
+            damage = damageDone;
+            note += " Soft armor AP is less than 15, damage is not reduced.";
+          }
+          note += " Soft armor SP reduced by 2.";
+        }
+      } else if (damageType === "Safety Rounds") {
+        if (armorType === "Hard" && armorSP > 9) {
+          damage = 0;
+          note = "Safety rounds do no damage to hard armor with SP > 9.";
+        }
+      } else if (damageType === "Shotgun Beanbag") {
+        damage = Math.max(damage, damageDone / 2);
+        note = "Stun only. Minimum half damage.";
+      }
+    }
+    return `&{template:default} {{name=Damage Through Armor}} {{${damageType} Damage=${damageDone}}} {{${armorType} Armor SP=${armorSP}}} {{Final Damage=${Math.floor(
+      damage
+    )}}}${note ? ` {{Note=${note}}}` : ""}`;
   },
 };
 
