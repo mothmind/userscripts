@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Roll20 Macro Injector
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-04
+// @version      2025-07-27.01
 // @description  Adds a macro menu to the chat bar
 // @author       mothmind
 // @match        https://app.roll20.net/editor/
@@ -13,7 +13,7 @@
 "use strict";
 
 const modalCache = new Map();
-const testMode = false;
+let testMode = false;
 
 /** @type {Record<string, () => string | Promise<string>>} */
 const macroRecord = {
@@ -349,8 +349,25 @@ const macroRecord = {
       }
     }
   },
-  "Error Out": () => {
-    throw new Error("This macro is not implemented yet!");
+  Deviation: () => {
+    const direction = rollDie(10);
+    const distance = rollDie(10);
+
+    const directionLabel =
+      {
+        1: "Short",
+        2: "Short Left",
+        3: "Short",
+        4: "Short Right",
+        5: "Left",
+        6: "Right",
+        7: "Long Left",
+        8: "Long",
+        9: "Long Right",
+        10: "Long",
+      }[direction.roll] || "Unknown Direction";
+
+    return `Missed by \`\`${distance.roll}\`\`m \`\`${directionLabel}\`\`.\n ${distance.label} ${direction.label}`;
   },
 };
 
@@ -374,16 +391,21 @@ function main() {
   min-width: 260px;
   text-align: center;
 }
+.moth-modal * {
+  box-sizing: border-box;
+}
 .moth-modal button {
   display: block;
   width: 100%;
   margin: 5px 0px;
   padding: 6px;
-  background: rgb(68, 68, 68);
+  background: rgb(112, 32, 130);
   color: rgb(238, 238, 238);
   border: 1px solid rgb(102, 102, 102);
   border-radius: 4px;
   cursor: pointer;
+  
+  margin-left: auto;
 }
 .moth-modal button.close-btn {
   position: absolute;
@@ -395,6 +417,12 @@ function main() {
   border: none;
   cursor: pointer;
   font-size: 16px;
+}
+.moth-modal button.toggle-debug {
+  background: rgb(64, 128, 64);
+  width: fit-content;
+  font-size: 10px;
+  padding: 3px 6px;
 }
 .moth-multi-input-modal {
   text-align: left;
@@ -412,6 +440,10 @@ function main() {
 }
 .moth-multi-input-modal input[type="checkbox"], .moth-multi-input-modal input[type="number"] {
   grid-column: 2;
+  width: fit-content;
+}
+.moth-multi-input-modal input[type="number"] {
+  width: 6ch;
 }
 #macro-menu-button {
   margin-left: 4px;
@@ -474,7 +506,7 @@ function openMacroModal() {
   modal.appendChild(closeBtn);
 
   const title = document.createElement("h3");
-  title.textContent = "Macro Menu";
+  title.textContent = "Moth Macros";
   modal.appendChild(title);
 
   Object.entries(macroRecord).forEach(([name, func]) => {
@@ -486,15 +518,21 @@ function openMacroModal() {
       const input = document.querySelector("textarea.ui-autocomplete-input");
       const sendButton = document.getElementById("chatSendBtn");
       if (input && sendButton) {
-        if (testMode) {
-          console.info(`Executing macro: ${name}`);
-          console.info("Response: ", await func());
+        try {
+          if (testMode) {
+            console.info(`Executing macro: ${name}`);
+            console.info("Response: ", await func());
+            modal.remove();
+          } else {
+            input.value = await func();
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            sendButton.click();
+            modal.remove();
+          }
+        } catch (e) {
+          console.error(`Error executing macro "${name}":`, e);
           modal.remove();
-        } else {
-          input.value = await func();
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          sendButton.click();
-          modal.remove();
+          alert(`Error executing macro "${name}": ${e.message}`);
         }
       } else {
         console.error("Could not find chat input or send button.");
@@ -504,6 +542,15 @@ function openMacroModal() {
 
     modal.appendChild(btn);
   });
+
+  const toggleTestMode = document.createElement("button");
+  toggleTestMode.textContent = testMode ? "Disable Debug" : "Enable Debug";
+  toggleTestMode.className = "toggle-debug";
+  toggleTestMode.addEventListener("click", () => {
+    testMode = !testMode;
+    toggleTestMode.textContent = testMode ? "Disable Debug" : "Enable Debug";
+  });
+  modal.appendChild(toggleTestMode);
 
   document.body.appendChild(modal);
 }
