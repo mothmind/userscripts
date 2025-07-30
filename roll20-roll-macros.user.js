@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Roll20 Macro Injector
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-27.02
+// @version      2025-07-30.01
 // @description  Adds a macro menu to the chat bar
 // @author       mothmind
 // @match        https://app.roll20.net/editor/
@@ -15,6 +15,100 @@
 
 const modalCache = new Map();
 let testMode = false;
+
+const damageTypes = /** @type {const} */ ([
+  "Normal",
+  "Armor Piercing",
+  "Armor Piercing Full Damage",
+  "Knife",
+  "Monoknife",
+  "Fire",
+  "Power Sword",
+  "Hollow Point",
+  "Safety Rounds",
+  "Monowire",
+  "Flechette/Railgun",
+  "Broadhead Arrow",
+  "Spinner Arrow",
+  "Shotgun Beanbag",
+]);
+const armorTypes = /** @type {const} */ (["Soft", "Hard"]);
+/** @type {Record<typeof damageTypes[number], {soft: number, hard: number, thru: number, special?: boolean}>} */
+const damageProfiles = {
+  Normal: {
+    soft: 1,
+    hard: 1,
+    thru: 1,
+  },
+  "Armor Piercing": {
+    soft: 1 / 2,
+    hard: 1 / 2,
+    thru: 1 / 2,
+  },
+  "Armor Piercing Full Damage": {
+    soft: 1 / 2,
+    hard: 1 / 2,
+    thru: 1,
+  },
+  Knife: {
+    soft: 1 / 2,
+    hard: 1,
+    thru: 1,
+  },
+  Monoknife: {
+    soft: 1 / 3,
+    hard: 2 / 3,
+    thru: 1,
+  },
+  Fire: {
+    soft: 1,
+    hard: 1,
+    thru: 1,
+    special: true,
+  },
+  "Power Sword": {
+    soft: 1 / 4,
+    hard: 1 / 2,
+    thru: 1,
+  },
+  "Hollow Point": {
+    soft: 2,
+    hard: 2,
+    thru: 2,
+  },
+  "Safety Rounds": {
+    soft: 2,
+    hard: 2,
+    thru: 3,
+    special: true,
+  },
+  Monowire: {
+    soft: 1 / 3,
+    hard: 1 / 3,
+    thru: 1,
+  },
+  "Flechette/Railgun": {
+    soft: 1 / 4,
+    hard: 1 / 4,
+    thru: 1 / 2,
+  },
+  "Broadhead Arrow": {
+    soft: 1 / 2,
+    hard: 1,
+    thru: 2,
+  },
+  "Spinner Arrow": {
+    soft: 1 / 2,
+    hard: 1,
+    thru: 3,
+  },
+  "Shotgun Beanbag": {
+    soft: 1,
+    hard: 1,
+    thru: 1,
+    special: true,
+  },
+};
 
 /** @type {Record<string, () => string | Promise<string>>} */
 const macroRecord = {
@@ -352,8 +446,6 @@ const macroRecord = {
   },
   "Grenade Deviation": () => {
     const direction = rollDie(10);
-    const distance = rollDie(10);
-
     const directionLabel =
       {
         1: "Short",
@@ -368,102 +460,9 @@ const macroRecord = {
         10: "Long",
       }[direction.roll] || "Unknown Direction";
 
-    return `Missed by \`\`${distance.roll}\`\`m \`\`${directionLabel}\`\`.\n ${distance.label} ${direction.label}`;
+    return `&{template:default} {{name=Grenade Deviation}} {{Direction=${directionLabel}}} {{Distance=[[1d10]]}}`;
   },
   "Damage Thru Armor": async () => {
-    const damageTypes = /** @type {const} */ ([
-      "Normal",
-      "Armor Piercing",
-      "Armor Piercing Full Damage",
-      "Knife",
-      "Monoknife",
-      "Fire",
-      "Power Sword",
-      "Hollow Point",
-      "Safety Rounds",
-      "Monowire",
-      "Flechette/Railgun",
-      "Broadhead Arrow",
-      "Spinner Arrow",
-      "Shotgun Beanbag",
-    ]);
-    /** @type {Record<typeof damageTypes[number], {soft: number, hard: number, thru: number, special?: boolean}>} */
-    const damageProfiles = {
-      Normal: {
-        soft: 1,
-        hard: 1,
-        thru: 1,
-      },
-      "Armor Piercing": {
-        soft: 1 / 2,
-        hard: 1 / 2,
-        thru: 1 / 2,
-      },
-      "Armor Piercing Full Damage": {
-        soft: 1 / 2,
-        hard: 1 / 2,
-        thru: 1,
-      },
-      Knife: {
-        soft: 1 / 2,
-        hard: 1,
-        thru: 1,
-      },
-      Monoknife: {
-        soft: 1 / 3,
-        hard: 2 / 3,
-        thru: 1,
-      },
-      Fire: {
-        soft: 1,
-        hard: 1,
-        thru: 1,
-        special: true,
-      },
-      "Power Sword": {
-        soft: 1 / 4,
-        hard: 1 / 2,
-        thru: 1,
-      },
-      "Hollow Point": {
-        soft: 2,
-        hard: 2,
-        thru: 2,
-      },
-      "Safety Rounds": {
-        soft: 2,
-        hard: 2,
-        thru: 3,
-        special: true,
-      },
-      Monowire: {
-        soft: 1 / 3,
-        hard: 1 / 3,
-        thru: 1,
-      },
-      "Flechette/Railgun": {
-        soft: 1 / 4,
-        hard: 1 / 4,
-        thru: 1 / 2,
-      },
-      "Broadhead Arrow": {
-        soft: 1 / 2,
-        hard: 1,
-        thru: 2,
-      },
-      "Spinner Arrow": {
-        soft: 1 / 2,
-        hard: 1,
-        thru: 3,
-      },
-      "Shotgun Beanbag": {
-        soft: 1,
-        hard: 1,
-        thru: 1,
-        special: true,
-      },
-    };
-    const armorTypes = /** @type {const} */ (["Soft", "Hard"]);
     const input = await getMultiInputModal({
       "Damage Done": "number",
       "Armor SP": "number",
@@ -481,30 +480,13 @@ const macroRecord = {
     // @ts-ignore
     const damageType = input["Damage Type"];
 
-    const { soft, hard, thru, special } = damageProfiles[damageType];
-    const effectiveSP = armorType === "Soft" ? soft * armorSP : hard * armorSP;
-    let damage = Math.max(0, (damageDone - effectiveSP) * thru);
-    let note = "";
-    if (special) {
-      if (damageType === "Fire") {
-        note = "Fire damage.";
-        if (armorType === "Soft") {
-          if (effectiveSP < 15) {
-            damage = damageDone;
-            note += " Soft armor AP is less than 15, damage is not reduced.";
-          }
-          note += " Soft armor SP reduced by 2.";
-        }
-      } else if (damageType === "Safety Rounds") {
-        if (armorType === "Hard" && armorSP > 9) {
-          damage = 0;
-          note = "Safety rounds do no damage to hard armor with SP > 9.";
-        }
-      } else if (damageType === "Shotgun Beanbag") {
-        damage = Math.max(damage, damageDone / 2);
-        note = "Stun only. Minimum half damage.";
-      }
-    }
+    const { damage, note } = damageThruArmor(
+      damageDone,
+      armorSP,
+      armorType,
+      damageType
+    );
+
     return `&{template:default} {{name=Damage Through Armor}} {{${damageType} Damage=${damageDone}}} {{${armorType} Armor SP=${armorSP}}} {{Final Damage=${Math.floor(
       damage
     )}}}${note ? ` {{Note=${note}}}` : ""}`;
@@ -620,6 +602,40 @@ function rollDie(sides, num = 1) {
   };
 }
 
+/**
+ * @param {number} damageDone
+ * @param {number} armorSP
+ * @param {typeof armorTypes[number]} armorType
+ * @param {typeof damageTypes[number]} damageType
+ */
+function damageThruArmor(damageDone, armorSP, armorType, damageType) {
+  const { soft, hard, thru, special } = damageProfiles[damageType];
+  const effectiveSP = armorType === "Soft" ? soft * armorSP : hard * armorSP;
+  let damage = Math.max(0, (damageDone - effectiveSP) * thru);
+  let note = "";
+  if (special) {
+    if (damageType === "Fire") {
+      note = "Fire damage.";
+      if (armorType === "Soft") {
+        if (armorSP < 15) {
+          damage = damageDone;
+          note += " Soft armor SP is less than 15, damage is not reduced.";
+        }
+        note += " Soft armor SP reduced by 2.";
+      }
+    } else if (damageType === "Safety Rounds") {
+      if (armorType === "Hard" && armorSP > 9) {
+        damage = 0;
+        note = "Safety rounds do no damage to hard armor with SP > 9.";
+      }
+    } else if (damageType === "Shotgun Beanbag") {
+      damage = Math.max(damage, damageDone / 2);
+      note = "Stun only. Minimum half damage.";
+    }
+  }
+  return { damage, note };
+}
+
 function injectMacroMenu(sendButton, chatContainer) {
   if (document.getElementById("macro-menu-button")) return; // Prevent duplicate injection
 
@@ -683,22 +699,14 @@ function openMacroModal() {
     modal.appendChild(btn);
   });
 
-  const toggleTestMode = document.createElement("button");
-  toggleTestMode.textContent = testMode ? "Disable Debug" : "Enable Debug";
-  toggleTestMode.className = "toggle-debug";
-  toggleTestMode.addEventListener("click", () => {
-    testMode = !testMode;
-    toggleTestMode.textContent = testMode ? "Disable Debug" : "Enable Debug";
-  });
-  modal.appendChild(toggleTestMode);
-
   document.body.appendChild(modal);
 }
+
 /**
  * Shows a modal with multiple input fields.
- * @template {Record<string, "number" | "text" | "checkbox" | string[]>} T
+ * @template {Record<string, "number" | "text" | "checkbox" | string[] | "armor">} T
  * @param {T} inputs
- * @returns {Promise<{[K in keyof T]: string}>} resolves to { [label]: value }
+ * @returns {Promise<{[K in keyof T]: string}>}
  */
 function getMultiInputModal(inputs) {
   return new Promise((resolve) => {
