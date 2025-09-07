@@ -112,6 +112,18 @@ const damageProfiles = {
 
 /** @type {Record<string, () => string | Promise<string>>} */
 const macroRecord = {
+  "d100 Roll": async () => {
+    const input = await  getMultiInputModal({
+      "Roll Label": "text",
+      "Skill Name": "text",
+      "Skill Level": "number",
+    });
+    const label = input["Roll Label"] || "d100 Roll";
+    const skillName = input["Skill Name"] || "";
+    const skillLevel = parseInt(input["Skill Level"]) || 0;
+
+    return `&{template:default} {{name=${label}}} {{${skillName} ${skillLevel}=[[1d100]]}}`;
+  },
   "Microwaver Effect": () => {
     const content = (() => {
       switch (rollDie(6).roll) {
@@ -158,6 +170,53 @@ const macroRecord = {
       }
     })();
     return `&{template:default} {{name=Microwaver}} {{Roll=🎲${content}}}`;
+  },
+  "Grenade Deviation": () => {
+    const direction = rollDie(10);
+    const directionLabel =
+      {
+        1: "Short",
+        2: "Short Left",
+        3: "Short",
+        4: "Short Right",
+        5: "Left",
+        6: "Right",
+        7: "Long Left",
+        8: "Long",
+        9: "Long Right",
+        10: "Long",
+      }[direction.roll] || "Unknown Direction";
+
+    return `&{template:default} {{name=Grenade Deviation}} {{Direction=${directionLabel}}} {{Distance=[[1d10]]}}`;
+  },
+  "Damage Thru Armor": async () => {
+    const input = await getMultiInputModal({
+      "Damage Done": "number",
+      "Armor SP": "number",
+      // @ts-ignore
+      "Armor Type": armorTypes,
+      // @ts-ignore
+      "Damage Type": damageTypes,
+    });
+    const damageDone = parseInt(input["Damage Done"]);
+    const armorSP = parseInt(input["Armor SP"]);
+    /** @type {typeof armorTypes[number]} */
+    // @ts-ignore
+    const armorType = input["Armor Type"];
+    /** @type {typeof damageTypes[number]} */
+    // @ts-ignore
+    const damageType = input["Damage Type"];
+
+    const { damage, note } = damageThruArmor(
+      damageDone,
+      armorSP,
+      armorType,
+      damageType
+    );
+
+    return `&{template:default} {{name=Damage Through Armor}} {{${damageType} Damage=${damageDone}}} {{${armorType} Armor SP=${armorSP}}} {{Final Damage=${Math.floor(
+      damage
+    )}}}${note ? ` {{Note=${note}}}` : ""}`;
   },
   "Vehicle Damage": async () => {
     const input = await getMultiInputModal({
@@ -443,53 +502,6 @@ const macroRecord = {
           return 0; // Fallback for unexpected values
       }
     }
-  },
-  "Grenade Deviation": () => {
-    const direction = rollDie(10);
-    const directionLabel =
-      {
-        1: "Short",
-        2: "Short Left",
-        3: "Short",
-        4: "Short Right",
-        5: "Left",
-        6: "Right",
-        7: "Long Left",
-        8: "Long",
-        9: "Long Right",
-        10: "Long",
-      }[direction.roll] || "Unknown Direction";
-
-    return `&{template:default} {{name=Grenade Deviation}} {{Direction=${directionLabel}}} {{Distance=[[1d10]]}}`;
-  },
-  "Damage Thru Armor": async () => {
-    const input = await getMultiInputModal({
-      "Damage Done": "number",
-      "Armor SP": "number",
-      // @ts-ignore
-      "Armor Type": armorTypes,
-      // @ts-ignore
-      "Damage Type": damageTypes,
-    });
-    const damageDone = parseInt(input["Damage Done"]);
-    const armorSP = parseInt(input["Armor SP"]);
-    /** @type {typeof armorTypes[number]} */
-    // @ts-ignore
-    const armorType = input["Armor Type"];
-    /** @type {typeof damageTypes[number]} */
-    // @ts-ignore
-    const damageType = input["Damage Type"];
-
-    const { damage, note } = damageThruArmor(
-      damageDone,
-      armorSP,
-      armorType,
-      damageType
-    );
-
-    return `&{template:default} {{name=Damage Through Armor}} {{${damageType} Damage=${damageDone}}} {{${armorType} Armor SP=${armorSP}}} {{Final Damage=${Math.floor(
-      damage
-    )}}}${note ? ` {{Note=${note}}}` : ""}`;
   },
 };
 
